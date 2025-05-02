@@ -25,7 +25,7 @@ Traditional digital signatures bind a static message to an identity. Structure S
 
 This work is based on:
 
-- [Structure Arithmetic: A Resonant Number Theory of Zeta Zeros and $\delta(x)$ (Li, 2025)]https://zenodo.org/records/15330643
+- [Structure Arithmetic: A Resonant Number Theory of Zeta Zeros and $\delta(x)$ ]https://zenodo.org/records/15330643
 - Post-quantum motivation, cryptographic binding, and residual analysis.
 
 ---
