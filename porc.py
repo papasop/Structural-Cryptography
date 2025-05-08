@@ -1,4 +1,4 @@
-# Structure UTXO + Structure Virtual Machine (SVM) with DAG Paths, Contract Layers, Dependencies, and Thread-Safe Execution
+# Structure UTXO + SVM with Recursive Paths, Advanced Matching, and DAG Mutation
 
 import math
 import hashlib
@@ -14,14 +14,16 @@ class StructureUTXO:
         self.entropy = entropy
         self.refs = refs
         self.id = hashlib.sha256(f"{x}{phi_val}".encode()).hexdigest()[:8]
+        self.locked = False  # example DAG-mutated flag
 
     def __repr__(self):
         return f"<ψ-{self.id} | δ={self.delta:.4f} | H={self.entropy:.2f}>"
 
 
-# --- Structure VM Contract DSL ---
+# --- Structure Contract with Pattern Matching and DAG Mutation ---
 class StructureContract:
-    def __init__(self, name, delta_thresh, entropy_thresh, action, priority=0, layer=0, depends_on: Optional[str] = None, ttl: int = -1):
+    def __init__(self, name, delta_thresh, entropy_thresh, action,
+                 priority=0, layer=0, depends_on: Optional[str] = None, ttl: int = -1):
         self.name = name
         self.delta_thresh = delta_thresh
         self.entropy_thresh = entropy_thresh
@@ -32,24 +34,29 @@ class StructureContract:
         self.ttl = ttl
         self.activation_count = 0
 
+    def match(self, utxos: List[StructureUTXO]) -> bool:
+        if len(utxos) < 2:
+            return False
+        head = utxos[0]
+        tail = utxos[-1]
+        return head.delta < self.delta_thresh and tail.entropy > self.entropy_thresh
+
     def check(self, utxos: List[StructureUTXO]) -> (bool, str):
-        avg_delta = sum(u.delta for u in utxos) / len(utxos)
-        min_entropy = min(u.entropy for u in utxos)
-        if avg_delta >= self.delta_thresh:
-            return False, f"Avg delta {avg_delta:.4f} exceeds threshold {self.delta_thresh}"
-        if min_entropy <= self.entropy_thresh:
-            return False, f"Min entropy {min_entropy:.2f} below threshold {self.entropy_thresh}"
+        if not self.match(utxos):
+            return False, "ψ-path does not match pattern"
         return True, "OK"
 
     def execute(self, utxos):
         passed, reason = self.check(utxos)
         if passed:
             self.activation_count += 1
+            for u in utxos:
+                u.locked = True  # example DAG mutation
             return self.action(utxos)
         return f"Skipped: {reason}"
 
 
-# --- Structure Virtual Machine Core ---
+# --- Structure Virtual Machine ---
 class StructureVM:
     def __init__(self, dag: Dict[str, StructureUTXO]):
         self.dag = dag
@@ -81,12 +88,12 @@ class StructureVM:
                 self.history.append((contract.name, [u.id for u in path], result))
                 if isinstance(result, str) and result.startswith("Reward"):
                     self.reward_pool += 10
-                    self.events.append(f"[Layer {contract.layer}] Event: Reward triggered by {[u.id for u in path]}")
+                    self.events.append(f"[Layer {contract.layer}] Reward triggered by {[u.id for u in path]}")
                     self.executed_contracts.add(contract.name)
                 elif isinstance(result, str) and result.startswith("Skipped"):
-                    self.events.append(f"[Layer {contract.layer}] Event: Contract skipped on {[u.id for u in path]} — {result}")
+                    self.events.append(f"[Layer {contract.layer}] Contract skipped on {[u.id for u in path]} — {result}")
                 else:
-                    self.events.append(f"[Layer {contract.layer}] Event: Executed {contract.name} on {[u.id for u in path]}")
+                    self.events.append(f"[Layer {contract.layer}] Executed {contract.name} on {[u.id for u in path]}")
                     self.executed_contracts.add(contract.name)
                 results.append((contract.name, path, result))
 
@@ -94,13 +101,20 @@ class StructureVM:
 
     def find_paths(self):
         paths = []
+
+        def dfs(current_path, visited):
+            last = current_path[-1]
+            paths.append(current_path[:])
+            for utxo in self.dag.values():
+                if utxo.id in visited:
+                    continue
+                if last.id in utxo.refs:
+                    dfs(current_path + [utxo], visited | {utxo.id})
+
         for utxo in self.dag.values():
             if not utxo.refs:
-                paths.append([utxo])
-            else:
-                for ref in utxo.refs:
-                    if ref in self.dag:
-                        paths.append([self.dag[ref], utxo])
+                dfs([utxo], {utxo.id})
+
         return paths
 
     def print_history(self):
@@ -118,7 +132,7 @@ class StructureVM:
 if __name__ == "__main__":
     utxo1 = StructureUTXO(x=1, phi_val=0.5, delta=0.2, entropy=0.95, refs=[])
     utxo2 = StructureUTXO(x=2, phi_val=0.3, delta=0.1, entropy=0.96, refs=[utxo1.id])
-    utxo3 = StructureUTXO(x=3, phi_val=0.7, delta=0.4, entropy=0.50, refs=[])
+    utxo3 = StructureUTXO(x=3, phi_val=0.7, delta=0.4, entropy=0.97, refs=[utxo2.id])
     dag = {u.id: u for u in [utxo1, utxo2, utxo3]}
 
     def reward_action(utxos):
